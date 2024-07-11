@@ -1,6 +1,6 @@
-module github.com/influxdata/line-protocol/v2
+module github.com/joanmp-ndtx/line-protocol/v2
 
-go 1.15
+go 1.22
 
 require (
 	github.com/frankban/quicktest v1.13.0
