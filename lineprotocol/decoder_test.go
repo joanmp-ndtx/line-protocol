@@ -140,452 +140,484 @@ var decoderTests = []struct {
 	// it's expected to be a DecodeError at that error position.
 	text   string
 	expect []Point
-}{{
-	testName: "all-fields-present-no-escapes",
-	text: `
+}{
+	{
+		testName: "all-fields-present-no-escapes",
+		text: `
    # comment
  somename,tag1=val1,tag2=val2  floatfield=1,strfield="hello",intfield=-1i,uintfield=1u,boolfield=true  1602841605822791506
 `,
-	expect: []Point{{
-		Measurement: "somename",
-		Tags: []TagKeyValue{{
-			Key:   "tag1",
-			Value: "val1",
-		}, {
-			Key:   "tag2",
-			Value: "val2",
+		expect: []Point{{
+			Measurement: "somename",
+			Tags: []TagKeyValue{{
+				Key:   "tag1",
+				Value: "val1",
+			}, {
+				Key:   "tag2",
+				Value: "val2",
+			}},
+			Fields: []FieldKeyValue{{
+				Key:   "floatfield",
+				Value: 1.0,
+			}, {
+				Key:   "strfield",
+				Value: "hello",
+			}, {
+				Key:   "intfield",
+				Value: int64(-1),
+			}, {
+				Key:   "uintfield",
+				Value: uint64(1),
+			}, {
+				Key:   "boolfield",
+				Value: true,
+			}},
+			Time: time.Unix(0, 1602841605822791506),
 		}},
-		Fields: []FieldKeyValue{{
-			Key:   "floatfield",
-			Value: 1.0,
-		}, {
-			Key:   "strfield",
-			Value: "hello",
-		}, {
-			Key:   "intfield",
-			Value: int64(-1),
-		}, {
-			Key:   "uintfield",
-			Value: uint64(1),
-		}, {
-			Key:   "boolfield",
-			Value: true,
-		}},
-		Time: time.Unix(0, 1602841605822791506),
-	}},
-}, {
-	testName: "multiple-entries",
-	text: `
+	}, {
+		testName: "multiple-entries",
+		text: `
    # comment
  m1,tag1=val1  x="first"  1602841605822791506
   m2,foo=bar  x="second"  1602841605822792000
 
  # last comment
 `,
-	expect: []Point{{
-		Measurement: "m1",
-		Tags: []TagKeyValue{{
-			Key:   "tag1",
-			Value: "val1",
+		expect: []Point{{
+			Measurement: "m1",
+			Tags: []TagKeyValue{{
+				Key:   "tag1",
+				Value: "val1",
+			}},
+			Fields: []FieldKeyValue{{
+				Key:   "x",
+				Value: "first",
+			}},
+			Time: time.Unix(0, 1602841605822791506),
+		}, {
+			Measurement: "m2",
+			Tags: []TagKeyValue{{
+				Key:   "foo",
+				Value: "bar",
+			}},
+			Fields: []FieldKeyValue{{
+				Key:   "x",
+				Value: "second",
+			}},
+			Time: time.Unix(0, 1602841605822792000),
 		}},
-		Fields: []FieldKeyValue{{
-			Key:   "x",
-			Value: "first",
-		}},
-		Time: time.Unix(0, 1602841605822791506),
 	}, {
-		Measurement: "m2",
-		Tags: []TagKeyValue{{
-			Key:   "foo",
-			Value: "bar",
-		}},
-		Fields: []FieldKeyValue{{
-			Key:   "x",
-			Value: "second",
-		}},
-		Time: time.Unix(0, 1602841605822792000),
-	}},
-}, {
-	testName: "multiple-entries-with-error#1",
-	text: `
+		testName: "multiple-entries-with-error#1",
+		text: `
 m1 value=12.0
 m2 value=∑¹2a.0
 m3 value=32.0
 m4 value=42.0
 `,
-	expect: []Point{{
-		Measurement: "m1",
-		Fields: []FieldKeyValue{{
-			Key:   "value",
-			Value: 12.0,
+		expect: []Point{{
+			Measurement: "m1",
+			Fields: []FieldKeyValue{{
+				Key:   "value",
+				Value: 12.0,
+			}},
+		}, {
+			Measurement: "m2",
+			Fields: []FieldKeyValue{{
+				Error: `at line ∑¹: cannot parse value for field key "value": invalid float value syntax`,
+			}},
+		}, {
+			Measurement: "m3",
+			Fields: []FieldKeyValue{{
+				Key:   "value",
+				Value: 32.0,
+			}},
+		}, {
+			Measurement: "m4",
+			Fields: []FieldKeyValue{{
+				Key:   "value",
+				Value: 42.0,
+			}},
 		}},
 	}, {
-		Measurement: "m2",
-		Fields: []FieldKeyValue{{
-			Error: `at line ∑¹: cannot parse value for field key "value": invalid float value syntax`,
-		}},
-	}, {
-		Measurement: "m3",
-		Fields: []FieldKeyValue{{
-			Key:   "value",
-			Value: 32.0,
-		}},
-	}, {
-		Measurement: "m4",
-		Fields: []FieldKeyValue{{
-			Key:   "value",
-			Value: 42.0,
-		}},
-	}},
-}, {
-	testName: "multiple-entries-with-error#2",
-	text: `
+		testName: "multiple-entries-with-error#2",
+		text: `
 m1 value=12.0
 m2∑¹
 m3 value=32.0
 `,
-	expect: []Point{{
-		Measurement: "m1",
-		Fields: []FieldKeyValue{{
-			Key:   "value",
-			Value: 12.0,
+		expect: []Point{{
+			Measurement: "m1",
+			Fields: []FieldKeyValue{{
+				Key:   "value",
+				Value: 12.0,
+			}},
+		}, {
+			Measurement: "m2",
+			// DecoderSkipSection: expect to see no error on TagSection but got error
+			Tags: []TagKeyValue{{
+				Error: `at line ∑¹: expected tag key or field but found '\n' instead`,
+			}},
+		}, {
+			Measurement: "m3",
+			Fields: []FieldKeyValue{{
+				Key:   "value",
+				Value: 32.0,
+			}},
 		}},
 	}, {
-		Measurement: "m2",
-		// DecoderSkipSection: expect to see no error on TagSection but got error
-		Tags: []TagKeyValue{{
-			Error: `at line ∑¹: expected tag key or field but found '\n' instead`,
-		}},
-	}, {
-		Measurement: "m3",
-		Fields: []FieldKeyValue{{
-			Key:   "value",
-			Value: 32.0,
-		}},
-	}},
-}, {
-	testName: "escaped-values",
-	text: `
+		testName: "escaped-values",
+		text: `
  comma\,1,equals\==e\,x,two=val2 field\=x="fir\"
 ,st\\"  1602841605822791506
 
  # last comment
 `,
-	expect: []Point{{
-		Measurement: "comma,1",
-		Tags: []TagKeyValue{{
-			Key:   "equals=",
-			Value: "e,x",
-		}, {
-			Key:   "two",
-			Value: "val2",
+		expect: []Point{{
+			Measurement: "comma,1",
+			Tags: []TagKeyValue{{
+				Key:   "equals=",
+				Value: "e,x",
+			}, {
+				Key:   "two",
+				Value: "val2",
+			}},
+			Fields: []FieldKeyValue{{
+				Key:   "field=x",
+				Value: "fir\"\n,st\\",
+			}},
+			Time: time.Unix(0, 1602841605822791506),
 		}},
-		Fields: []FieldKeyValue{{
-			Key:   "field=x",
-			Value: "fir\"\n,st\\",
+	}, {
+		testName: "missing-quotes",
+		text:     `TestBucket FieldOné=∑¹Happy,FieldTwo=sad`,
+		expect: []Point{{
+			Measurement: "TestBucket",
+			Fields: []FieldKeyValue{{
+				Error: `at line ∑¹: value for field "FieldOné" ("Happy") has unrecognized type`,
+			}},
 		}},
-		Time: time.Unix(0, 1602841605822791506),
-	}},
-}, {
-	testName: "missing-quotes",
-	text:     `TestBucket FieldOné=∑¹Happy,FieldTwo=sad`,
-	expect: []Point{{
-		Measurement: "TestBucket",
-		Fields: []FieldKeyValue{{
-			Error: `at line ∑¹: value for field "FieldOné" ("Happy") has unrecognized type`,
-		}},
-	}},
-}, {
-	testName: "trailing-comma-after-measurement",
-	text: `TestBuckét,∑¹ FieldOne=Happy
+	}, {
+		testName: "trailing-comma-after-measurement",
+		text: `TestBuckét,∑¹ FieldOne=Happy
 next x=1`,
-	expect: []Point{{
-		MeasurementError: "at line ∑¹: expected tag key after comma; got white space instead",
+		expect: []Point{{
+			MeasurementError: "at line ∑¹: expected tag key after comma; got white space instead",
+		}, {
+			Measurement: "next",
+			Fields: []FieldKeyValue{{
+				Key:   "x",
+				Value: 1.0,
+			}},
+		}},
 	}, {
-		Measurement: "next",
-		Fields: []FieldKeyValue{{
-			Key:   "x",
-			Value: 1.0,
+		testName: "missing-comma-after-field",
+		text:     `TestBuckét TagOné="Happy" ∑¹FieldOne=123.45`,
+		expect: []Point{{
+			Measurement: "TestBuckét",
+			Fields: []FieldKeyValue{{
+				Key:   "TagOné",
+				Value: "Happy",
+			}},
+			TimeError: `at line ∑¹: invalid timestamp ("FieldOne=123.45")`,
 		}},
-	}},
-}, {
-	testName: "missing-comma-after-field",
-	text:     `TestBuckét TagOné="Happy" ∑¹FieldOne=123.45`,
-	expect: []Point{{
-		Measurement: "TestBuckét",
-		Fields: []FieldKeyValue{{
-			Key:   "TagOné",
-			Value: "Happy",
-		}},
-		TimeError: `at line ∑¹: invalid timestamp ("FieldOne=123.45")`,
-	}},
-}, {
-	testName: "missing timestamp",
-	text:     "b f=1",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-	}},
-}, {
-	testName: "missing timestamp with newline",
-	text:     "b f=1\n",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-	}},
-}, {
-	testName: "out-of-range-timestamp",
-	text:     "b f=1 ∑¹9223372036854775808",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-		TimeError: `at line ∑¹: invalid timestamp ("9223372036854775808"): line-protocol value out of range`,
-	}},
-}, {
-	testName: "out-of-range-timestamp-due-to-precision",
-	text:     "b f=1 ∑¹200000000000000000",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-		Precision: Second,
-		TimeError: `at line ∑¹: invalid timestamp ("200000000000000000"): line-protocol value out of range`,
-	}},
-}, {
-	testName: "negative-timestamp-just-in-range",
-	text:     "b f=1 ∑¹-9223372036854775808",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-		Time: time.Unix(0, -9223372036854775808),
-	}},
-}, {
-	testName: "negative-timestamp-just-out-of-range",
-	text:     "b f=1 ∑¹-9223372036854775809",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-		TimeError: `at line ∑¹: invalid timestamp ("-9223372036854775809"): line-protocol value out of range`,
-	}},
-}, {
-	testName: "missing-timestamp-with-default",
-	text:     "b f=1",
-	expect: []Point{{
-		Measurement: "b",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
-		}},
-		DefaultTime: time.Unix(0, 1643971097811314803),
-		Time:        time.Unix(0, 1643971097811314803),
-	}},
-}, {
-	testName: "field-with-space-and-no-timestamp",
-	text:     "9 f=-7 ",
-	expect: []Point{{
-		Measurement: "9",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: -7.0,
-		}},
-	}},
-}, {
-	testName: "carriage-returns",
-	text:     "# foo\r\nm x=1\r\n\r\n",
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Key:   "x",
-			Value: 1.0,
-		}},
-	}},
-}, {
-	testName: "carriage-return-in-comment",
-	text:     "∑¹# foo\rxxx\nm x=1\r\n\r\n",
-	expect: []Point{{
-		MeasurementError: "at line ∑¹: invalid character found in comment line",
 	}, {
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Key:   "x",
-			Value: 1.0,
+		testName: "missing timestamp",
+		text:     "b f=1",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
 		}},
-	}},
-}, {
-	// This test ensures that the ErrValueOutOfRange error is
-	// propagated correctly with errors.Is
-	testName: "out-of-range-value",
-	text:     "mmmé é=∑¹1e9999999999999",
-	expect: []Point{{
-		Measurement: "mmmé",
-		Fields: []FieldKeyValue{{
-			Error: `at line ∑¹: cannot parse value for field key "é": line-protocol value out of range`,
+	}, {
+		testName: "missing timestamp with newline",
+		text:     "b f=1\n",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
 		}},
-	}},
-}, {
-	testName: "field-key-error-after-newline-in-string",
-	// Note: we've deliberately got two fields below so that
-	// if we ever change error behaviour so that the caller
-	// can see multiple errors on a single line, this test should
-	// fail (see comment in the Next method).
-	text: "m f=1,∑¹\x01=1,\x01=2",
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: 1.0,
+	}, {
+		testName: "out-of-range-timestamp",
+		text:     "b f=1 ∑¹9223372036854775808",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
+			TimeError: `at line ∑¹: invalid timestamp ("9223372036854775808"): line-protocol value out of range`,
+		}},
+	}, {
+		testName: "out-of-range-timestamp-due-to-precision",
+		text:     "b f=1 ∑¹200000000000000000",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
+			Precision: Second,
+			TimeError: `at line ∑¹: invalid timestamp ("200000000000000000"): line-protocol value out of range`,
+		}},
+	}, {
+		testName: "negative-timestamp-just-in-range",
+		text:     "b f=1 ∑¹-9223372036854775808",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
+			Time: time.Unix(0, -9223372036854775808),
+		}},
+	}, {
+		testName: "negative-timestamp-just-out-of-range",
+		text:     "b f=1 ∑¹-9223372036854775809",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
+			TimeError: `at line ∑¹: invalid timestamp ("-9223372036854775809"): line-protocol value out of range`,
+		}},
+	}, {
+		testName: "missing-timestamp-with-default",
+		text:     "b f=1",
+		expect: []Point{{
+			Measurement: "b",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}},
+			DefaultTime: time.Unix(0, 1643971097811314803),
+			Time:        time.Unix(0, 1643971097811314803),
+		}},
+	}, {
+		testName: "field-with-space-and-no-timestamp",
+		text:     "9 f=-7 ",
+		expect: []Point{{
+			Measurement: "9",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: -7.0,
+			}},
+		}},
+	}, {
+		testName: "carriage-returns",
+		text:     "# foo\r\nm x=1\r\n\r\n",
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Key:   "x",
+				Value: 1.0,
+			}},
+		}},
+	}, {
+		testName: "carriage-return-in-comment",
+		text:     "∑¹# foo\rxxx\nm x=1\r\n\r\n",
+		expect: []Point{{
+			MeasurementError: "at line ∑¹: invalid character found in comment line",
 		}, {
-			Error: `at line ∑¹: invalid character '\x01' found at start of field key`,
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Key:   "x",
+				Value: 1.0,
+			}},
 		}},
-	}},
-}, {
-	testName: "field-value-error-after-newline-in-string",
-	text:     "m f=\"hello\ngoodbye\nx\",gé=∑¹invalid",
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: "hello\ngoodbye\nx",
-		}, {
-			Error: `at line ∑¹: value for field "gé" ("invalid") has unrecognized type`,
+	}, {
+		// This test ensures that the ErrValueOutOfRange error is
+		// propagated correctly with errors.Is
+		testName: "out-of-range-value",
+		text:     "mmmé é=∑¹1e9999999999999",
+		expect: []Point{{
+			Measurement: "mmmé",
+			Fields: []FieldKeyValue{{
+				Error: `at line ∑¹: cannot parse value for field key "é": line-protocol value out of range`,
+			}},
 		}},
-	}},
-}, {
-	testName: "field-string-value-error-after-newline-in-string",
-	text:     "m f=\"a\nb\",g=∑¹\"c\nd",
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Key:   "f",
-			Value: "a\nb",
-		}, {
-			Error: `at line ∑¹: expected closing quote for string field "g", found end of input`,
+	}, {
+		testName: "field-key-error-after-newline-in-string",
+		// Note: we've deliberately got two fields below so that
+		// if we ever change error behaviour so that the caller
+		// can see multiple errors on a single line, this test should
+		// fail (see comment in the Next method).
+		text: "m f=1,∑¹\x01=1,\x01=2",
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: 1.0,
+			}, {
+				Error: `at line ∑¹: invalid character '\x01' found at start of field key`,
+			}},
 		}},
-	}},
-}, {
-	testName: "non-printable-ASCII-in-tag-key",
-	text:     "m foo∑¹\x01=bar x=1",
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Error: `at line ∑¹: want '=' after field key "foo", found '\x01'`,
+	}, {
+		testName: "field-value-error-after-newline-in-string",
+		text:     "m f=\"hello\ngoodbye\nx\",gé=∑¹invalid",
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: "hello\ngoodbye\nx",
+			}, {
+				Error: `at line ∑¹: value for field "gé" ("invalid") has unrecognized type`,
+			}},
 		}},
-	}},
-}, {
-	testName: "non-printable-ASCII-in-tag-key",
-	text:     "m,∑¹foo\x03=bar x=1",
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Error: `at line ∑¹: expected '=' after tag key "foo", but got '\x03' instead`,
+	}, {
+		testName: "field-string-value-error-after-newline-in-string",
+		text:     "m f=\"a\nb\",g=∑¹\"c\nd",
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Key:   "f",
+				Value: "a\nb",
+			}, {
+				Error: `at line ∑¹: expected closing quote for string field "g", found end of input`,
+			}},
 		}},
-	}},
-}, {
-	testName: "non-printable-ASCII-in-tag-value",
-	text:     "m,foo=bar∑¹\x02 x=1",
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Key:   "foo",
-			Value: "bar",
-		}, {
-			Error: `at line ∑¹: expected tag key or field but found '\x02' instead`,
+	}, {
+		testName: "non-printable-ASCII-in-tag-key",
+		text:     "m foo∑¹\x01=bar x=1",
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Error: `at line ∑¹: want '=' after field key "foo", found '\x01'`,
+			}},
 		}},
-	}},
-}, {
-	testName: "non-printable-ASCII-in-field-key",
-	text:     "m foo∑¹\x01=bar",
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Error: `at line ∑¹: want '=' after field key "foo", found '\x01'`,
+	}, {
+		testName: "non-printable-ASCII-in-tag-key",
+		text:     "m,∑¹foo\x03=bar x=1",
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Error: `at line ∑¹: expected '=' after tag key "foo", but got '\x03' instead`,
+			}},
 		}},
-	}},
-}, {
-	testName: "backslash-escapes-in-string-field",
-	text:     `m s="\t\r\n\v"`,
-	expect: []Point{{
-		Measurement: "m",
-		Fields: []FieldKeyValue{{
-			Key:   "s",
-			Value: "\t\r\n\\v",
+	}, {
+		testName: "non-printable-ASCII-in-tag-value",
+		text:     "m,foo=bar∑¹\x02 x=1",
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Key:   "foo",
+				Value: "bar",
+			}, {
+				Error: `at line ∑¹: expected tag key or field but found '\x02' instead`,
+			}},
 		}},
-	}},
-}, {
-	testName: "backslash-escapes-in-tags",
-	text:     `m,s=\t\r\n\v x=1`,
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Key:   "s",
-			Value: `\t\r\n\v`,
+	}, {
+		testName: "non-printable-ASCII-in-field-key",
+		text:     "m foo∑¹\x01=bar",
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Error: `at line ∑¹: want '=' after field key "foo", found '\x01'`,
+			}},
 		}},
-		Fields: []FieldKeyValue{{
-			Key:   "x",
-			Value: 1.0,
+	}, {
+		testName: "backslash-escapes-in-string-field",
+		text:     `m s="\t\r\n\v"`,
+		expect: []Point{{
+			Measurement: "m",
+			Fields: []FieldKeyValue{{
+				Key:   "s",
+				Value: "\t\r\n\\v",
+			}},
 		}},
-	}},
-}, {
-	testName: "bad-tag-key-#1",
-	text:     "m∑¹",
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Error: `at line ∑¹: expected tag key or field but found end of input instead`,
+	}, {
+		testName: "backslash-escapes-in-tags",
+		text:     `m,s=\t\r\n\v x=1`,
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Key:   "s",
+				Value: `\t\r\n\v`,
+			}},
+			Fields: []FieldKeyValue{{
+				Key:   "x",
+				Value: 1.0,
+			}},
 		}},
-	}},
-}, {
-	testName: "bad-tag-key-#2",
-	text:     "m,∑¹=bar¹",
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Error: `at line ∑¹: empty tag key`,
+	}, {
+		testName: "bad-tag-key-#1",
+		text:     "m∑¹",
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Error: `at line ∑¹: expected tag key or field but found end of input instead`,
+			}},
 		}},
-	}},
-}, {
-	testName: "bad-tag-key-#3",
-	text:     "m,∑¹x =y¹",
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Error: `at line ∑¹: expected '=' after tag key "x", but got ' ' instead`,
+	}, {
+		testName: "bad-tag-key-#2",
+		text:     "m,∑¹=bar¹",
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Error: `at line ∑¹: empty tag key`,
+			}},
 		}},
-	}},
-}, {
-	testName: "bad-tag-key-#4",
-	text:     "m,∑¹x",
-	expect: []Point{{
-		Measurement: "m",
-		Tags: []TagKeyValue{{
-			Error: `at line ∑¹: expected '=' after tag key "x", but got end of input instead`,
+	}, {
+		testName: "bad-tag-key-#3",
+		text:     "m,∑¹x =y¹",
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Error: `at line ∑¹: expected '=' after tag key "x", but got ' ' instead`,
+			}},
 		}},
-	}},
-}}
+	}, {
+		testName: "bad-tag-key-#4",
+		text:     "m,∑¹x",
+		expect: []Point{{
+			Measurement: "m",
+			Tags: []TagKeyValue{{
+				Error: `at line ∑¹: expected '=' after tag key "x", but got end of input instead`,
+			}},
+		}},
+	}, {
+		testName: "tags-without-value",
+		text:     `my-mesurement,tag1=va1,tag2=val2,tag3=val3,tag4=,tag5=val5 my-field-1=275,my-field-2=2048 1720618024249000000`,
+		expect: []Point{{
+			Measurement: "my-mesurement",
+			Tags: []TagKeyValue{{
+				Key:   "tag1",
+				Value: "va1",
+			}, {
+				Key:   "tag2",
+				Value: "val2",
+			}, {
+				Key:   "tag3",
+				Value: "val3",
+			}, {
+				Key:   "tag4",
+				Value: "undefined",
+			}, {
+				Key:   "tag5",
+				Value: "val5",
+			}, 
+		},
+			Fields: []FieldKeyValue{{
+				Key:   "my-field-1",
+				Value: float64(275),
+			}, {
+				Key:   "my-field-2",
+				Value: float64(2048),
+			}},
+			Time: time.Unix(0, 1720618024249000000),
+		}},
+	}}
 
 func TestDecoder(t *testing.T) {
 	c := qt.New(t)
 	for _, test := range decoderTests {
 		c.Run(test.testName, func(c *qt.C) {
 			errp, text := makeErrPositions(test.text)
-			dec := NewDecoderWithBytes([]byte(text))
+			dec := NewDecoderWithBytesAndPopulate([]byte(text), "undefined")
 			assertDecodeResult(c, dec, test.expect, false, errp)
 		})
 	}
@@ -676,7 +708,7 @@ func TestDecoderSkipSection(t *testing.T) {
 				sect := section(secti)
 				c.Run(sect.String(), func(c *qt.C) {
 					errp, text := makeErrPositions(test.text)
-					dec := NewDecoderWithBytes([]byte(text))
+					dec := NewDecoderWithBytesAndPopulate([]byte(text), "undefined")
 					i := 0
 					for dec.Next() {
 						if i >= len(test.expect) {

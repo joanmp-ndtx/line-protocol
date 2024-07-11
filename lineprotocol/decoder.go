@@ -90,6 +90,9 @@ type Decoder struct {
 
 	// err holds any non-EOF error that was returned from rd.
 	err error
+
+	// Uses a default value for tags without value.
+	emptyLabelValue string
 }
 
 // NewDecoder returns a decoder that splits the line-protocol text
@@ -100,6 +103,16 @@ func NewDecoderWithBytes(buf []byte) *Decoder {
 		complete: true,
 		section:  endSection,
 		line:     1,
+	}
+}
+
+func NewDecoderWithBytesAndPopulate(buf []byte, emptyLabelValue string) *Decoder {
+	return &Decoder{
+		buf:          buf,
+		complete:     true,
+		section:      endSection,
+		line:         1,
+		emptyLabelValue: emptyLabelValue,
 	}
 }
 
@@ -233,8 +246,10 @@ func (d *Decoder) NextTag() (key, value []byte, err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(tagVal) == 0 {
+	if len(tagVal) == 0 && d.emptyLabelValue == "" {
 		return nil, nil, d.syntaxErrorf(i0, "expected tag value after tag key %q, but none found", tagKey)
+	} else if len(tagVal) == 0 {
+		tagVal = []byte(d.emptyLabelValue)
 	}
 	if !d.ensure(1) {
 		// There's no more data after the tag value. Instead of returning an error

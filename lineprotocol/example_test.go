@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/line-protocol/v2/lineprotocol"
+	"github.com/joanmp-ndtx/line-protocol/v3/lineprotocol"
 )
 
 func ExampleDecoder() {
